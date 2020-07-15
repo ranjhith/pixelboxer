@@ -9,7 +9,10 @@ use std::convert::TryFrom;
 
 fn trim_end_of_line(s: &String) -> &str {
     let len = s.len();
-    &s[0..(len-1)]
+    match &s.chars().nth(len-1).unwrap() {
+        '\n' => &s[0..(len-1)],
+        _ => &s[0..len],
+    }    
 }
 
 fn main() {
@@ -34,20 +37,28 @@ fn main() {
     let mut reader = BufReader::new(in_file);
 
     let mut header_p6 = String::new();
-    let mut header_width = String::new();
+    let mut header_width_height = String::new();
     let mut header_height = String::new();
     let mut header_maxval = String::new();
     
     reader.read_line(&mut header_p6);
-    reader.read_line(&mut header_width);
-    reader.read_line(&mut header_height);
-    reader.read_line(&mut header_maxval);
-
     assert_eq!(trim_end_of_line(&header_p6), "P6");
-    assert_eq!(trim_end_of_line(&header_maxval).parse::<usize>().unwrap(), 255);
 
-    let width = trim_end_of_line(&header_width).parse::<usize>().unwrap();
-    let height = trim_end_of_line(&header_height).parse::<usize>().unwrap();
+    reader.read_line(&mut header_width_height);
+    let mut iter = trim_end_of_line(&header_width_height).split_ascii_whitespace();
+    let width = iter.next().unwrap().parse::<usize>().unwrap();
+    
+    let height: usize;
+    let next = iter.next();
+    if next.is_none() {
+        reader.read_line(&mut header_height);
+        height = trim_end_of_line(&header_height).parse::<usize>().unwrap();
+    } else {
+        height = next.unwrap().parse::<usize>().unwrap();
+    }   
+    
+    reader.read_line(&mut header_maxval);
+    assert_eq!(trim_end_of_line(&header_maxval).parse::<usize>().unwrap(), 255);
 
     println!("{}: {} x {} pixels", display, width, height);
 
@@ -55,13 +66,8 @@ fn main() {
     let mut in_vec_u8: Vec<u8> = Vec::new();
     let in_size = match reader.read_to_end(&mut in_vec_u8) {
         Err(why) => panic!("couldn't read {}: {}", display, why),
-        Ok(in_size) => {
-            println!("{} opened!", display);
-            in_size
-        },
+        Ok(in_size) => in_size,
     };
-
-    println!("In in_size: {} pixels: {}", in_size, in_vec_u8.len() / 3);    
 
     let path = Path::new(out_filename);
     let display = path.display();
@@ -74,7 +80,7 @@ fn main() {
 
     let mut writer = BufWriter::new(&out_file);
 
-    write!(&mut writer, "P6\n{}\n{}\n{}\n", width * blowup, height * blowup, 255);
+    write!(&mut writer, "P6\n{}\n{} {}\n", width * blowup, height * blowup, 255);
 
     assert_eq!(in_vec_u8.len(), width * height * 3);
 
@@ -93,9 +99,9 @@ fn main() {
                     let in_index_y = out_index_y / blowup;
                     let in_index = in_index_y * width + in_index_x;
                     let out_index = ((out_index_y + tempy) * width * blowup) + out_index_x + tempx;
-                    if in_index == 0 || in_index == 1 || in_index == 1791 {
-                        println!("in_index: {} out_index: {} out_index_x: {} out_index_y: {} tempx: {} tempy: {}", in_index, out_index, out_index_x, out_index_y, tempx, tempy);
-                    }
+                    // if in_index == 0 || in_index == 1 || in_index == 1791 {
+                    //     println!("in_index: {} out_index: {} out_index_x: {} out_index_y: {} tempx: {} tempy: {}", in_index, out_index, out_index_x, out_index_y, tempx, tempy);
+                    // }
                     out_vec[out_index * 3] = in_vec_u8[in_index * 3];
                     out_vec[out_index * 3 + 1] = in_vec_u8[in_index * 3 + 1];
                     out_vec[out_index * 3 + 2] = in_vec_u8[in_index * 3 + 2];
